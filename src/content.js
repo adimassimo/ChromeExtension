@@ -29,7 +29,7 @@ function onPageLoad() {
 
                     const items = [];
                     itemGroups.forEach((group, index) => {
-                        const plusMinus = plusMinusElements[index].innerText.trim();
+                        const plusMinus = plusMinusElements[index] ? plusMinusElements[index].innerText.trim() : null;
                         const itemElements = group.querySelectorAll('.history_item_name');
                         itemElements.forEach(itemElement => {
                             const item = {
@@ -167,24 +167,32 @@ function onPageLoad() {
                 timestamp: new Date(),
                 pagesLoaded: pagesLoaded,
                 totalRows: trimmedData.length,
-                data: trimmedData
             };
             localStorage.setItem('lastLoadTime', new Date());
             console.log('Data saved to local storage.');
             updateLastFullRun();
 
-            // Send data to the API
-            //LOCALLY replace https://csdegenerator-976197890228.us-central1.run.app with http://127.0.0.1:8080 for testing
-            const response = await fetch('https://csdegenerator-976197890228.us-central1.run.app/api/inventory', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(currentRun)
-            });
-            const result = await response.json();
-            console.log('Data sent to API:', result);
+            // Split trimmedData into chunks of 1000 records
+            const chunkSize = 1000;
+            const dataChunks = [];
+            for (let i = 0; i < trimmedData.length; i += chunkSize) {
+                dataChunks.push(trimmedData.slice(i, i + chunkSize));
+            }
+
+            // Send each chunk to the API
+            //LOCALLY replace https://csdegenerator-976197890228.us-central1.run.app/ with http://127.0.0.1:8080/ for testing
+            for (const chunk of dataChunks) {
+                const response = await fetch('https://csdegenerator-976197890228.us-central1.run.app/api/inventory', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ ...currentRun, data: chunk })
+                });
+                const result = await response.json();
+                console.log('Data chunk sent to API:', result);
+            }
         } catch (error) {
             console.error('Error saving data to local storage or sending to API:', error);
         }
@@ -376,7 +384,8 @@ function onPageLoad() {
                 document.getElementById('startScrapeButton').addEventListener('click', () => {
                     checkLastRun();
                     updateLastFullRun();
-                    if (document.getElementById('startScrapeButton').hidden == false) {                
+                    if (document.getElementById('startScrapeButton').hidden == false) { 
+                        document.getElementById('startScrapeButton').hidden = true;  
                         const loadMoreCount = parseInt(document.getElementById('loadMoreCount').value, 10);
                         loadAllRows(loadMoreCount);
                     }
